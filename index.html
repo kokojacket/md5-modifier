@@ -5,34 +5,92 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>视频文件 MD5 修改器</title>
     <style>
+        :root {
+            --primary-color: #2196F3;
+            --primary-dark: #1976D2;
+            --success-color: #4CAF50;
+            --danger-color: #f44336;
+            --border-radius: 8px;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
-            background: #f5f5f5;
+            background: #f0f2f5;
+            color: #333;
+            line-height: 1.6;
         }
 
         .container {
             background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            margin: 0 0 20px;
+            color: #1a1a1a;
+            font-size: 2em;
+            text-align: center;
+        }
+
+        .settings-panel {
+            background: #f8f9fa;
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+
+        .settings-panel h2 {
+            margin: 0 0 15px;
+            font-size: 1.2em;
+            color: #444;
+        }
+
+        .suffix-input {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .suffix-input input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            flex: 1;
+            max-width: 200px;
         }
 
         .drop-zone {
             border: 2px dashed #ccc;
-            border-radius: 4px;
-            padding: 20px;
+            border-radius: var(--border-radius);
+            padding: 40px 20px;
             text-align: center;
             margin: 20px 0;
             background: #fafafa;
             transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .drop-zone:hover {
+            border-color: var(--primary-color);
+            background: #f5f5f5;
         }
 
         .drop-zone.drag-over {
-            border-color: #2196F3;
+            border-color: var(--primary-color);
             background: #E3F2FD;
+        }
+
+        .drop-zone p {
+            margin: 0;
+            font-size: 1.1em;
+            color: #666;
         }
 
         .file-list {
@@ -43,8 +101,17 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px;
-            border-bottom: 1px solid #eee;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: var(--border-radius);
+            margin-bottom: 10px;
+            background: #fff;
+            transition: transform 0.2s ease;
+        }
+
+        .file-item:hover {
+            transform: translateX(5px);
+            border-color: #ddd;
         }
 
         .file-info {
@@ -55,108 +122,142 @@
             font-family: monospace;
             color: #666;
             font-size: 0.9em;
-        }
-
-        button {
-            background: #2196F3;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.3s ease;
-        }
-
-        button:hover {
-            background: #1976D2;
-        }
-
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-
-        .progress {
-            height: 4px;
-            background: #eee;
             margin-top: 5px;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-
-        .progress-bar {
-            height: 100%;
-            background: #2196F3;
-            width: 0;
-            transition: width 0.3s ease;
-        }
-
-        .status {
-            margin-top: 5px;
-            font-size: 0.9em;
-            color: #666;
         }
 
         .button-group {
             margin: 20px 0;
             display: flex;
-            gap: 10px;
+            gap: 15px;
             justify-content: flex-end;
         }
 
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: white;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .download-all {
-            background: #4CAF50;
+            background: var(--success-color);
         }
 
-        .download-all:hover {
+        .download-all:hover:not(:disabled) {
             background: #388E3C;
-        }
-
-        .download-all:disabled {
-            background: #ccc;
+            transform: translateY(-1px);
         }
 
         .clear-all {
-            background: #f44336;
+            background: var(--danger-color);
         }
 
-        .clear-all:hover {
+        .clear-all:hover:not(:disabled) {
             background: #d32f2f;
-        }
-
-        .file-actions {
-            display: flex;
-            gap: 5px;
+            transform: translateY(-1px);
         }
 
         .download-btn {
-            background: #2196F3;
+            background: var(--primary-color);
+            padding: 8px 16px;
         }
 
-        .download-btn:hover {
-            background: #1976D2;
+        .download-btn:hover:not(:disabled) {
+            background: var(--primary-dark);
         }
 
         .remove-btn {
-            background: #f44336;
+            background: var(--danger-color);
+            padding: 8px 16px;
         }
 
-        .remove-btn:hover {
+        .remove-btn:hover:not(:disabled) {
             background: #d32f2f;
+        }
+
+        .progress {
+            height: 6px;
+            background: #eee;
+            margin-top: 8px;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--primary-color);
+            width: 0;
+            transition: width 0.3s ease;
+        }
+
+        .status {
+            margin-top: 8px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .file-item {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .file-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>视频文件 MD5 修改器</h1>
+        
+        <div class="settings-panel">
+            <h2>设置</h2>
+            <div class="suffix-input">
+                <label for="customSuffix">自定义后缀：</label>
+                <input type="text" id="customSuffix" placeholder="例如: _new" value="_new">
+            </div>
+        </div>
+
         <div class="drop-zone" id="dropZone">
             <p>拖放文件到此处或点击选择文件</p>
             <input type="file" id="fileInput" multiple accept=".mp4,.avi,.mkv,.mov" style="display: none">
         </div>
+        
         <div class="button-group">
-            <button id="clearAllBtn" class="clear-all" onclick="clearAllFiles()">清除所有</button>
-            <button id="downloadAllBtn" class="download-all" disabled onclick="downloadAllFiles()">下载全部</button>
+            <button id="downloadAllBtn" class="download-all" disabled onclick="downloadAllFiles()">
+                <span>下载全部</span>
+            </button>
+            <button id="clearAllBtn" class="clear-all" onclick="clearAllFiles()">
+                <span>清除所有</span>
+            </button>
         </div>
+        
         <div class="file-list" id="fileList"></div>
     </div>
 
@@ -455,14 +556,14 @@
             if (!fileInfo || !fileInfo.modifiedFile) return;
 
             try {
+                const customSuffix = document.getElementById('customSuffix').value || '_new';
                 const a = document.createElement('a');
                 const url = URL.createObjectURL(fileInfo.modifiedFile);
                 a.href = url;
-                a.download = `${fileInfo.file.name.replace(/\.[^/.]+$/, '')}-new${fileInfo.file.name.match(/\.[^/.]+$/)[0]}`;
+                a.download = `${fileInfo.file.name.replace(/\.[^/.]+$/, '')}${customSuffix}${fileInfo.file.name.match(/\.[^/.]+$/)[0]}`;
                 document.body.appendChild(a);
                 a.click();
                 
-                // 延迟释放URL对象，确保下载开始后再释放
                 setTimeout(() => {
                     URL.revokeObjectURL(url);
                     document.body.removeChild(a);
@@ -479,7 +580,6 @@
             downloadBtn.disabled = true;
             
             try {
-                // 获取所有已完成处理的文件
                 const completedFiles = Array.from(files.entries())
                     .filter(([_, fileInfo]) => fileInfo.status === 'completed');
                 
@@ -488,13 +588,10 @@
                     return;
                 }
 
-                // 通知用户
                 alert(`即将下载 ${completedFiles.length} 个文件，请允许浏览器的多个下载`);
-
-                // 创建一个延迟函数
                 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+                const customSuffix = document.getElementById('customSuffix').value || '_new';
 
-                // 逐个下载文件，每个文件之间有更长的延迟
                 for (let i = 0; i < completedFiles.length; i++) {
                     const [fileId, fileInfo] = completedFiles[i];
                     
@@ -502,16 +599,14 @@
                         const a = document.createElement('a');
                         const url = URL.createObjectURL(fileInfo.modifiedFile);
                         a.href = url;
-                        a.download = `${fileInfo.file.name.replace(/\.[^/.]+$/, '')}-new${fileInfo.file.name.match(/\.[^/.]+$/)[0]}`;
+                        a.download = `${fileInfo.file.name.replace(/\.[^/.]+$/, '')}${customSuffix}${fileInfo.file.name.match(/\.[^/.]+$/)[0]}`;
                         document.body.appendChild(a);
                         a.click();
                         
-                        // 延迟释放资源
                         await delay(1500);
                         URL.revokeObjectURL(url);
                         document.body.removeChild(a);
                         
-                        // 每个文件之间增加额外延迟，避免浏览器限制
                         if (i < completedFiles.length - 1) {
                             await delay(1000);
                         }
@@ -523,7 +618,6 @@
                 console.error('批量下载出错:', error);
                 alert('下载过程中出现错误，请重试');
             } finally {
-                // 重新启用下载按钮
                 updateDownloadAllButton();
             }
         }
