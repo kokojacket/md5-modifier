@@ -207,6 +207,26 @@
             color: #666;
         }
 
+        .directory-input {
+            margin-top: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .select-dir-btn {
+            background: var(--primary-color);
+        }
+
+        .select-dir-btn:hover:not(:disabled) {
+            background: var(--primary-dark);
+        }
+
+        .selected-dir {
+            color: #666;
+            font-size: 0.9em;
+        }
+
         @media (max-width: 768px) {
             body {
                 padding: 10px;
@@ -240,7 +260,11 @@
             <h2>设置</h2>
             <div class="suffix-input">
                 <label for="customSuffix">自定义后缀：</label>
-                <input type="text" id="customSuffix" placeholder="例如: _new" value="_new">
+                <input type="text" id="customSuffix" placeholder="例如: -new" value="-new">
+            </div>
+            <div class="directory-input">
+                <button onclick="selectSaveDirectory()" class="select-dir-btn">选择保存目录</button>
+                <span id="selectedDirPath" class="selected-dir">未选择目录</span>
             </div>
         </div>
 
@@ -254,7 +278,7 @@
                 <span>下载全部</span>
             </button>
             <button id="clearAllBtn" class="clear-all" onclick="clearAllFiles()">
-                <span>清除所有</span>
+                <span>删除所有</span>
             </button>
         </div>
         
@@ -264,20 +288,49 @@
     <script>
         const ALLOWED_EXTENSIONS = ['.mp4', '.avi', '.mkv', '.mov'];
         const files = new Map();
+        let selectedDirHandle = null;
 
-        // 生成随机MD5
-        async function calculateMd5(file) {
-            return new Promise((resolve) => {
-                // 使用简单的随机MD5生成方法
-                // 注意：这只是模拟，并非真正的MD5计算
-                const randomMd5 = Array.from(
-                    { length: 32 }, 
-                    () => Math.floor(Math.random() * 16).toString(16)
-                ).join('');
+        // 选择保存目录
+        async function selectSaveDirectory() {
+            try {
+                if (!('showDirectoryPicker' in window)) {
+                    alert('你的浏览器不支持选择目录功能，文件将保存到默认下载位置');
+                    return;
+                }
+
+                const dirHandle = await window.showDirectoryPicker({
+                    mode: 'readwrite'
+                });
+                selectedDirHandle = dirHandle;
                 
-                // 模拟计算需要一些时间
-                setTimeout(() => resolve(randomMd5), 200);
-            });
+                // 更新UI显示选中的目录
+                const pathSpan = document.getElementById('selectedDirPath');
+                pathSpan.textContent = dirHandle.name;
+                pathSpan.title = `已选择目录: ${dirHandle.name}`;
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error('选择目录失败:', err);
+                    alert('选择目录失败: ' + err.message);
+                }
+            }
+        }
+
+        // 保存文件到指定目录
+        async function saveFileToDirectory(fileData, fileName) {
+            if (!selectedDirHandle) {
+                return false;
+            }
+
+            try {
+                const fileHandle = await selectedDirHandle.getFileHandle(fileName, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(fileData);
+                await writable.close();
+                return true;
+            } catch (err) {
+                console.error('保存文件失败:', err);
+                return false;
+            }
         }
 
         // 修改初始化函数
@@ -550,17 +603,28 @@
             });
         }
 
-        // 下载修改后的文件
-        function downloadFile(fileId) {
+        // 修改下载文件函数
+        async function downloadFile(fileId) {
             const fileInfo = files.get(fileId);
             if (!fileInfo || !fileInfo.modifiedFile) return;
 
             try {
-                const customSuffix = document.getElementById('customSuffix').value || '_new';
+                const customSuffix = document.getElementById('customSuffix').value || '-new';
+                const newFileName = `${fileInfo.file.name.replace(/\.[^/.]+$/, '')}${customSuffix}${fileInfo.file.name.match(/\.[^/.]+$/)[0]}`;
+
+                // 如果选择了目录，尝试保存到指定目录
+                if (selectedDirHandle) {
+                    const saved = await saveFileToDirectory(fileInfo.modifiedFile, newFileName);
+                    if (saved) {
+                        return;
+                    }
+                }
+
+                // 如果没有选择目录或保存失败，使用默认下载方式
                 const a = document.createElement('a');
                 const url = URL.createObjectURL(fileInfo.modifiedFile);
                 a.href = url;
-                a.download = `${fileInfo.file.name.replace(/\.[^/.]+$/, '')}${customSuffix}${fileInfo.file.name.match(/\.[^/.]+$/)[0]}`;
+                a.download = newFileName;
                 document.body.appendChild(a);
                 a.click();
                 
@@ -574,7 +638,7 @@
             }
         }
 
-        // 下载全部已处理的文件
+        // 修改批量下载函数
         async function downloadAllFiles() {
             const downloadBtn = document.getElementById('downloadAllBtn');
             downloadBtn.disabled = true;
@@ -588,18 +652,28 @@
                     return;
                 }
 
-                alert(`即将下载 ${completedFiles.length} 个文件，请允许浏览器的多个下载`);
                 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-                const customSuffix = document.getElementById('customSuffix').value || '_new';
+                const customSuffix = document.getElementById('customSuffix').value || '-new';
 
                 for (let i = 0; i < completedFiles.length; i++) {
                     const [fileId, fileInfo] = completedFiles[i];
                     
                     try {
+                        const newFileName = `${fileInfo.file.name.replace(/\.[^/.]+$/, '')}${customSuffix}${fileInfo.file.name.match(/\.[^/.]+$/)[0]}`;
+
+                        // 如果选择了目录，尝试保存到指定目录
+                        if (selectedDirHandle) {
+                            const saved = await saveFileToDirectory(fileInfo.modifiedFile, newFileName);
+                            if (saved) {
+                                continue;
+                            }
+                        }
+
+                        // 如果没有选择目录或保存失败，使用默认下载方式
                         const a = document.createElement('a');
                         const url = URL.createObjectURL(fileInfo.modifiedFile);
                         a.href = url;
-                        a.download = `${fileInfo.file.name.replace(/\.[^/.]+$/, '')}${customSuffix}${fileInfo.file.name.match(/\.[^/.]+$/)[0]}`;
+                        a.download = newFileName;
                         document.body.appendChild(a);
                         a.click();
                         
@@ -620,6 +694,21 @@
             } finally {
                 updateDownloadAllButton();
             }
+        }
+
+        // 生成随机MD5
+        async function calculateMd5(file) {
+            return new Promise((resolve) => {
+                // 使用简单的随机MD5生成方法
+                // 注意：这只是模拟，并非真正的MD5计算
+                const randomMd5 = Array.from(
+                    { length: 32 }, 
+                    () => Math.floor(Math.random() * 16).toString(16)
+                ).join('');
+                
+                // 模拟计算需要一些时间
+                setTimeout(() => resolve(randomMd5), 200);
+            });
         }
 
         // 处理单个文件时分块读取文件，避免内存问题
@@ -668,8 +757,8 @@
 
         // 清除所有文件
         function clearAllFiles() {
-            // 询问用户是否确认清除
-            if (files.size > 0 && !confirm('确定要清除所有文件吗？')) {
+            // 询问用户是否确认删除
+            if (files.size > 0 && !confirm('确定要删除所有文件吗？')) {
                 return;
             }
             
