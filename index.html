@@ -250,6 +250,50 @@
                 justify-content: flex-end;
             }
         }
+
+        /* 提示框样式 */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: #323232;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            margin: 8px;
+            opacity: 0;
+            transform: translateY(100%);
+            animation: slideIn 0.3s ease forwards;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toast.success {
+            background: var(--success-color);
+        }
+
+        .toast.error {
+            background: var(--danger-color);
+        }
+
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideOut {
+            to {
+                opacity: 0;
+                transform: translateY(100%);
+            }
+        }
     </style>
 </head>
 <body>
@@ -284,6 +328,7 @@
         
         <div class="file-list" id="fileList"></div>
     </div>
+    <div class="toast-container" id="toastContainer"></div>
 
     <script>
         const ALLOWED_EXTENSIONS = ['.mp4', '.avi', '.mkv', '.mov'];
@@ -315,7 +360,22 @@
             }
         }
 
-        // 保存文件到指定目录
+        // 显示提示框
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            // 3秒后自动消失
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease forwards';
+                setTimeout(() => container.removeChild(toast), 300);
+            }, 3000);
+        }
+
+        // 修改保存文件到指定目录的函数
         async function saveFileToDirectory(fileData, fileName) {
             if (!selectedDirHandle) {
                 return false;
@@ -326,9 +386,11 @@
                 const writable = await fileHandle.createWritable();
                 await writable.write(fileData);
                 await writable.close();
+                showToast(`文件 ${fileName} 已保存到 ${selectedDirHandle.name}`);
                 return true;
             } catch (err) {
                 console.error('保存文件失败:', err);
+                showToast(`保存文件 ${fileName} 失败: ${err.message}`, 'error');
                 return false;
             }
         }
@@ -631,10 +693,11 @@
                 setTimeout(() => {
                     URL.revokeObjectURL(url);
                     document.body.removeChild(a);
+                    showToast(`文件 ${newFileName} 开始下载`);
                 }, 1000);
             } catch (error) {
                 console.error('下载文件时出错:', error);
-                alert(`下载文件"${fileInfo.file.name}"时出错: ${error.message}`);
+                showToast(`下载文件 ${fileInfo.file.name} 失败: ${error.message}`, 'error');
             }
         }
 
@@ -648,12 +711,13 @@
                     .filter(([_, fileInfo]) => fileInfo.status === 'completed');
                 
                 if (completedFiles.length === 0) {
-                    alert('没有可下载的文件');
+                    showToast('没有可下载的文件', 'error');
                     return;
                 }
 
                 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                 const customSuffix = document.getElementById('customSuffix').value || '-new';
+                let successCount = 0;
 
                 for (let i = 0; i < completedFiles.length; i++) {
                     const [fileId, fileInfo] = completedFiles[i];
@@ -665,6 +729,7 @@
                         if (selectedDirHandle) {
                             const saved = await saveFileToDirectory(fileInfo.modifiedFile, newFileName);
                             if (saved) {
+                                successCount++;
                                 continue;
                             }
                         }
@@ -680,17 +745,23 @@
                         await delay(1500);
                         URL.revokeObjectURL(url);
                         document.body.removeChild(a);
+                        successCount++;
                         
                         if (i < completedFiles.length - 1) {
                             await delay(1000);
                         }
                     } catch (error) {
                         console.error(`下载文件 ${fileInfo.file.name} 时出错:`, error);
+                        showToast(`下载文件 ${fileInfo.file.name} 失败: ${error.message}`, 'error');
                     }
+                }
+
+                if (successCount > 0) {
+                    showToast(`成功处理 ${successCount} 个文件`);
                 }
             } catch (error) {
                 console.error('批量下载出错:', error);
-                alert('下载过程中出现错误，请重试');
+                showToast('下载过程中出现错误，请重试', 'error');
             } finally {
                 updateDownloadAllButton();
             }
@@ -757,11 +828,6 @@
 
         // 清除所有文件
         function clearAllFiles() {
-            // 询问用户是否确认删除
-            if (files.size > 0 && !confirm('确定要删除所有文件吗？')) {
-                return;
-            }
-            
             // 清空文件列表
             files.clear();
             document.getElementById('fileList').innerHTML = '';
