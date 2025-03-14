@@ -335,16 +335,186 @@
         const files = new Map();
         let selectedDirHandle = null;
 
+        // 尝试恢复之前的目录句柄
+        async function tryRestoreDirectoryHandle() {
+            try {
+                // 检查是否支持File System Access API
+                if (!('showDirectoryPicker' in window) || !('indexedDB' in window)) {
+                    return false;
+                }
+
+                // 尝试从IndexedDB获取保存的目录句柄
+                const dirHandle = await getSavedDirectoryHandle();
+                if (!dirHandle) {
+                    return false;
+                }
+
+                try {
+                    // 请求权限
+                    const permission = await dirHandle.requestPermission({ mode: 'readwrite' });
+                    if (permission === 'granted') {
+                        selectedDirHandle = dirHandle;
+                        
+                        // 更新UI显示选中的目录
+                        const pathSpan = document.getElementById('selectedDirPath');
+                        pathSpan.textContent = dirHandle.name;
+                        pathSpan.title = `已选择目录: ${dirHandle.name}`;
+                        showToast(`已恢复保存目录: ${dirHandle.name}`, 'success');
+                        return true;
+                    }
+                } catch (permErr) {
+                    console.error('请求目录权限失败:', permErr);
+                }
+                
+                // 如果恢复失败，清除保存的句柄
+                clearSavedDirectoryHandle();
+                return false;
+            } catch (err) {
+                console.error('恢复目录句柄时出错:', err);
+                return false;
+            }
+        }
+
+        // 使用IndexedDB存储目录句柄
+        async function saveDirectoryHandle(dirHandle) {
+            return new Promise((resolve, reject) => {
+                try {
+                    if (!dirHandle) {
+                        resolve(false);
+                        return;
+                    }
+
+                    const request = indexedDB.open('MD5ModifierDB', 1);
+                    
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result;
+                        if (!db.objectStoreNames.contains('handles')) {
+                            db.createObjectStore('handles', { keyPath: 'id' });
+                        }
+                    };
+                    
+                    request.onsuccess = (event) => {
+                        const db = event.target.result;
+                        const transaction = db.transaction(['handles'], 'readwrite');
+                        const store = transaction.objectStore('handles');
+                        
+                        const storeRequest = store.put({
+                            id: 'saveDir',
+                            handle: dirHandle
+                        });
+                        
+                        storeRequest.onsuccess = () => resolve(true);
+                        storeRequest.onerror = () => {
+                            console.error("存储目录句柄失败");
+                            resolve(false);
+                        };
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error("打开数据库失败:", event.target.error);
+                        resolve(false);
+                    };
+                } catch (err) {
+                    console.error('保存目录句柄失败:', err);
+                    resolve(false);
+                }
+            });
+        }
+
+        // 从IndexedDB获取保存的目录句柄
+        async function getSavedDirectoryHandle() {
+            return new Promise((resolve, reject) => {
+                try {
+                    const request = indexedDB.open('MD5ModifierDB', 1);
+                    
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result;
+                        if (!db.objectStoreNames.contains('handles')) {
+                            db.createObjectStore('handles', { keyPath: 'id' });
+                        }
+                    };
+                    
+                    request.onsuccess = (event) => {
+                        const db = event.target.result;
+                        try {
+                            const transaction = db.transaction(['handles'], 'readonly');
+                            const store = transaction.objectStore('handles');
+                            
+                            const getRequest = store.get('saveDir');
+                            
+                            getRequest.onsuccess = () => {
+                                if (getRequest.result) {
+                                    resolve(getRequest.result.handle);
+                                } else {
+                                    resolve(null);
+                                }
+                            };
+                            
+                            getRequest.onerror = () => {
+                                console.error("获取目录句柄失败");
+                                resolve(null);
+                            };
+                        } catch (txError) {
+                            console.error("事务错误:", txError);
+                            resolve(null);
+                        }
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error("打开数据库失败:", event.target.error);
+                        resolve(null);
+                    };
+                } catch (err) {
+                    console.error('获取目录句柄失败:', err);
+                    resolve(null);
+                }
+            });
+        }
+
+        // 清除保存的目录句柄
+        async function clearSavedDirectoryHandle() {
+            return new Promise((resolve) => {
+                try {
+                    const request = indexedDB.open('MD5ModifierDB', 1);
+                    
+                    request.onsuccess = (event) => {
+                        const db = event.target.result;
+                        const transaction = db.transaction(['handles'], 'readwrite');
+                        const store = transaction.objectStore('handles');
+                        
+                        const deleteRequest = store.delete('saveDir');
+                        
+                        deleteRequest.onsuccess = () => resolve(true);
+                        deleteRequest.onerror = () => {
+                            console.error("删除目录句柄失败");
+                            resolve(false);
+                        };
+                    };
+                    
+                    request.onerror = () => {
+                        console.error("打开数据库失败");
+                        resolve(false);
+                    };
+                } catch (err) {
+                    console.error('清除目录句柄失败:', err);
+                    resolve(false);
+                }
+            });
+        }
+
         // 选择保存目录
         async function selectSaveDirectory() {
             try {
                 if (!('showDirectoryPicker' in window)) {
-                    alert('你的浏览器不支持选择目录功能，文件将保存到默认下载位置');
+                    showToast('你的浏览器不支持选择目录功能，文件将保存到默认下载位置', 'error');
                     return;
                 }
 
                 const dirHandle = await window.showDirectoryPicker({
-                    mode: 'readwrite'
+                    mode: 'readwrite',
+                    // 添加可选的提示信息
+                    id: 'md5ModifierSaveDir',
+                    startIn: 'downloads'
                 });
                 selectedDirHandle = dirHandle;
                 
@@ -352,10 +522,16 @@
                 const pathSpan = document.getElementById('selectedDirPath');
                 pathSpan.textContent = dirHandle.name;
                 pathSpan.title = `已选择目录: ${dirHandle.name}`;
+                showToast(`已成功选择保存目录: ${dirHandle.name}`, 'success');
+                
+                // 保存目录句柄
+                await saveDirectoryHandle(dirHandle);
             } catch (err) {
-                if (err.name !== 'AbortError') {
+                if (err.name === 'AbortError') {
+                    showToast('用户取消了目录选择', 'error');
+                } else {
                     console.error('选择目录失败:', err);
-                    alert('选择目录失败: ' + err.message);
+                    showToast('选择目录失败: ' + err.message, 'error');
                 }
             }
         }
@@ -838,6 +1014,20 @@
 
         // 初始化页面
         initializeEvents();
+        
+        // 页面加载完成后自动请求目录权限（立即执行）
+        setTimeout(async () => {
+            // 首先尝试恢复之前保存的目录
+            const restored = await tryRestoreDirectoryHandle();
+            
+            // 如果没有恢复成功，并且浏览器支持目录选择API，则请求新的目录
+            if (!restored && 'showDirectoryPicker' in window) {
+                showToast('即将请求选择保存目录权限...', 'success');
+                setTimeout(() => selectSaveDirectory(), 1000);
+            } else if (!('showDirectoryPicker' in window)) {
+                showToast('您的浏览器不支持文件系统访问API，文件将保存到默认下载位置', 'error');
+            }
+        }, 500);
     </script>
 </body>
 </html> 
