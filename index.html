@@ -251,12 +251,12 @@
             }
         }
 
-        /* 提示框样式 - 重新定位到顶部中央 */
+        /* 提示框样式 - 重新定位到任务列表旁边 */
         .toast-container {
             position: fixed;
-            top: 20px;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
+            transform: translate(-50%, -50%);
             z-index: 1000;
             width: auto;
             max-width: 80%;
@@ -269,13 +269,14 @@
             border-radius: 4px;
             margin: 8px;
             opacity: 0;
-            transform: translateY(-20px);
-            animation: slideDown 0.3s ease forwards;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            animation: fadeIn 0.3s ease forwards;
             display: flex;
             align-items: center;
             gap: 8px;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
             text-align: center;
+            font-size: 1.05em;
+            min-width: 300px;
         }
 
         .toast.success {
@@ -290,17 +291,21 @@
             background: var(--primary-color);
         }
 
-        @keyframes slideDown {
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: scale(1);
             }
         }
 
-        @keyframes slideUp {
+        @keyframes fadeOut {
             to {
                 opacity: 0;
-                transform: translateY(-20px);
+                transform: scale(0.8);
             }
         }
 
@@ -413,6 +418,93 @@
             background: #ef9a9a;
             color: #c62828;
         }
+
+        /* 下载进度覆盖层 */
+        .download-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            display: none;
+        }
+
+        .download-overlay-content {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            color: #333;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .download-overlay-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .download-overlay-subtitle {
+            font-size: 1.1em;
+            margin-bottom: 20px;
+            color: #666;
+        }
+
+        .download-progress-bar {
+            height: 10px;
+            background: #eee;
+            border-radius: 5px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .download-progress-bar-inner {
+            height: 100%;
+            background: var(--primary-color);
+            width: 0;
+            border-radius: 5px;
+            transition: width 0.5s ease;
+        }
+
+        .download-file-info {
+            margin: 10px 0;
+            font-size: 0.9em;
+            color: #666;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .download-counter {
+            font-size: 1.2em;
+            font-weight: 500;
+            margin: 15px 0;
+            color: var(--primary-color);
+        }
+
+        .download-overlay-close {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .download-overlay-close:hover {
+            background: var(--primary-dark);
+        }
     </style>
 </head>
 <body>
@@ -459,6 +551,23 @@
         <div class="file-list" id="fileList"></div>
     </div>
     <div class="toast-container" id="toastContainer"></div>
+
+    <!-- 下载进度覆盖层 -->
+    <div class="download-overlay" id="downloadOverlay">
+        <div class="download-overlay-content">
+            <div class="download-overlay-title">批量下载进行中</div>
+            <div class="download-overlay-subtitle" id="downloadOverlaySubtitle">正在处理文件...</div>
+
+            <div class="download-progress-bar">
+                <div class="download-progress-bar-inner" id="downloadProgressBar"></div>
+            </div>
+
+            <div class="download-counter" id="downloadCounter">0/0</div>
+            <div class="download-file-info" id="downloadFileInfo">准备中...</div>
+
+            <button class="download-overlay-close" id="downloadOverlayClose" onclick="hideDownloadOverlay()">关闭</button>
+        </div>
+    </div>
 
     <script>
         const ALLOWED_EXTENSIONS = ['.mp4', '.avi', '.mkv', '.mov'];
@@ -676,7 +785,7 @@
 
             // 3秒后自动消失
             setTimeout(() => {
-                toast.style.animation = 'slideUp 0.3s ease forwards';
+                toast.style.animation = 'fadeOut 0.3s ease forwards';
                 setTimeout(() => container.removeChild(toast), 300);
             }, 3000);
 
@@ -1088,6 +1197,58 @@
             }
         }
 
+        // 显示下载进度覆盖层
+        function showDownloadOverlay(total) {
+            const overlay = document.getElementById('downloadOverlay');
+            const progressBar = document.getElementById('downloadProgressBar');
+            const counter = document.getElementById('downloadCounter');
+            const fileInfo = document.getElementById('downloadFileInfo');
+            const subtitle = document.getElementById('downloadOverlaySubtitle');
+            
+            // 重置进度
+            progressBar.style.width = '0%';
+            counter.textContent = `0/${total}`;
+            fileInfo.textContent = '准备下载...';
+            subtitle.textContent = `共 ${total} 个文件等待处理`;
+            
+            // 显示覆盖层
+            overlay.style.display = 'flex';
+            
+            // 禁用关闭按钮，直到处理完成
+            document.getElementById('downloadOverlayClose').disabled = true;
+        }
+        
+        // 更新下载进度
+        function updateDownloadProgress(current, total, fileName, fileSize) {
+            const progressBar = document.getElementById('downloadProgressBar');
+            const counter = document.getElementById('downloadCounter');
+            const fileInfo = document.getElementById('downloadFileInfo');
+            const subtitle = document.getElementById('downloadOverlaySubtitle');
+            
+            // 更新进度条
+            const percent = Math.round((current / total) * 100);
+            progressBar.style.width = `${percent}%`;
+            
+            // 更新计数器
+            counter.textContent = `${current}/${total}`;
+            
+            // 更新文件信息
+            fileInfo.textContent = `当前处理: ${fileName} (${fileSize})`;
+            
+            // 更新副标题
+            if (current === total) {
+                subtitle.textContent = '所有文件处理完成!';
+                document.getElementById('downloadOverlayClose').disabled = false;
+            } else {
+                subtitle.textContent = `正在处理第 ${current} 个文件，共 ${total} 个`;
+            }
+        }
+        
+        // 隐藏下载进度覆盖层
+        function hideDownloadOverlay() {
+            document.getElementById('downloadOverlay').style.display = 'none';
+        }
+
         // 修改批量下载函数
         async function downloadAllFiles() {
             const downloadBtn = document.getElementById('downloadAllBtn');
@@ -1103,6 +1264,9 @@
                     return;
                 }
 
+                // 显示下载进度覆盖层
+                showDownloadOverlay(completedFiles.length);
+                
                 updateGlobalStatus(`开始批量下载 ${completedFiles.length} 个文件`, 'info', true, '', 0, completedFiles.length);
                 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                 const customSuffix = document.getElementById('customSuffix').value || '-new';
@@ -1113,7 +1277,14 @@
                     
                     try {
                         const newFileName = `${fileInfo.file.name.replace(/\.[^/.]+$/, '')}${customSuffix}${fileInfo.file.name.match(/\.[^/.]+$/)[0]}`;
-                        updateGlobalStatus(`正在保存 (${i+1}/${completedFiles.length}): ${newFileName}`, 'info', true, `文件大小: ${(fileInfo.file.size / (1024 * 1024)).toFixed(2)} MB`, i, completedFiles.length);
+                        const fileSizeMB = (fileInfo.file.size / (1024 * 1024)).toFixed(2);
+                        const fileSizeGB = (fileInfo.file.size / (1024 * 1024 * 1024)).toFixed(2);
+                        const sizeDisplay = fileSizeMB > 1024 ? `${fileSizeGB} GB` : `${fileSizeMB} MB`;
+                        
+                        // 更新下载进度覆盖层
+                        updateDownloadProgress(i + 1, completedFiles.length, newFileName, sizeDisplay);
+                        
+                        updateGlobalStatus(`正在保存 (${i+1}/${completedFiles.length}): ${newFileName}`, 'info', true, `文件大小: ${sizeDisplay}`, i, completedFiles.length);
 
                         // 如果选择了目录，尝试保存到指定目录
                         if (selectedDirHandle) {
@@ -1146,19 +1317,36 @@
                         console.error(`下载文件 ${fileInfo.file.name} 时出错:`, error);
                         showToast(`下载文件 ${fileInfo.file.name} 失败: ${error.message}`, 'error');
                         updateGlobalStatus(`下载失败: ${fileInfo.file.name}`, 'error', false, error.message, successCount, completedFiles.length);
+                        
+                        // 更新下载进度覆盖层，标记错误
+                        const fileInfo = document.getElementById('downloadFileInfo');
+                        fileInfo.textContent = `错误: ${error.message}`;
+                        fileInfo.style.color = '#f44336';
                     }
                 }
 
                 if (successCount > 0) {
                     showToast(`成功处理 ${successCount} 个文件`);
                     updateGlobalStatus(`批量下载完成: ${successCount}/${completedFiles.length} 个文件`, 'success', false, `所有任务已完成`, successCount, completedFiles.length);
+                    
+                    // 更新下载进度覆盖层
+                    const fileInfo = document.getElementById('downloadFileInfo');
+                    fileInfo.textContent = `成功下载 ${successCount} 个文件，共 ${completedFiles.length} 个`;
+                    fileInfo.style.color = '#4CAF50';
                 }
             } catch (error) {
                 console.error('批量下载出错:', error);
                 showToast('下载过程中出现错误，请重试', 'error');
                 updateGlobalStatus('批量下载失败', 'error', false, error.message);
+                
+                // 更新下载进度覆盖层
+                const fileInfo = document.getElementById('downloadFileInfo');
+                fileInfo.textContent = `下载过程中出现错误: ${error.message}`;
+                fileInfo.style.color = '#f44336';
             } finally {
                 updateDownloadAllButton();
+                // 启用关闭按钮
+                document.getElementById('downloadOverlayClose').disabled = false;
             }
         }
 
