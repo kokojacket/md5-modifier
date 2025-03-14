@@ -341,42 +341,11 @@
 
         /* Toast 通知 */
         .toast-container {
-            position: fixed;
-            top: var(--spacing-lg);
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: var(--spacing-sm);
-            pointer-events: none;
+            display: none; /* 不再使用通知系统 */
         }
 
         .toast {
-            background: var(--neutral-800);
-            color: white;
-            padding: var(--spacing-md) var(--spacing-xl);
-            border-radius: var(--radius-md);
-            box-shadow: var(--shadow-lg);
-            opacity: 0;
-            transform: translateY(-20px);
-            animation: toastIn var(--transition-normal) forwards;
-            max-width: 400px;
-            text-align: center;
-            pointer-events: auto;
-        }
-
-        .toast.success {
-            background: var(--success-500);
-        }
-
-        .toast.error {
-            background: var(--error-500);
-        }
-
-        .toast.info {
-            background: var(--primary-500);
+            display: none; /* 不再使用通知系统 */
         }
 
         @keyframes toastIn {
@@ -492,74 +461,7 @@
 
         /* 下载进度覆盖层 */
         .download-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.75);
-            z-index: 1000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(4px);
-        }
-
-        .download-overlay-content {
-            background: white;
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-xl);
-            width: 90%;
-            max-width: 500px;
-            box-shadow: var(--shadow-lg);
-        }
-
-        .download-overlay-title {
-            font-size: var(--font-size-lg);
-            font-weight: 600;
-            color: var(--neutral-900);
-            margin-bottom: var(--spacing-md);
-            text-align: center;
-        }
-
-        .download-overlay-subtitle {
-            font-size: var(--font-size-md);
-            color: var(--neutral-600);
-            margin-bottom: var(--spacing-lg);
-            text-align: center;
-        }
-
-        .download-progress-bar {
-            height: 8px;
-            background: var(--neutral-100);
-            border-radius: var(--radius-sm);
-            margin: var(--spacing-lg) 0;
-            overflow: hidden;
-        }
-
-        .download-progress-bar-inner {
-            height: 100%;
-            background: var(--primary-500);
-            width: 0;
-            transition: width var(--transition-normal);
-        }
-
-        .download-counter {
-            font-size: var(--font-size-lg);
-            font-weight: 600;
-            color: var(--primary-500);
-            text-align: center;
-            margin: var(--spacing-md) 0;
-        }
-
-        .download-file-info {
-            font-size: var(--font-size-sm);
-            color: var(--neutral-600);
-            text-align: center;
-            margin: var(--spacing-md) 0;
-            padding: var(--spacing-sm);
-            background: var(--neutral-50);
-            border-radius: var(--radius-sm);
+            display: none; /* 隐藏弹窗，不再使用 */
         }
 
         /* 响应式设计 */
@@ -694,24 +596,6 @@
         </footer>
     </div>
 
-    <div class="toast-container" id="toastContainer"></div>
-
-    <div class="download-overlay" id="downloadOverlay">
-        <div class="download-overlay-content">
-            <div class="download-overlay-title">批量下载进行中</div>
-            <div class="download-overlay-subtitle" id="downloadOverlaySubtitle">正在处理文件...</div>
-
-            <div class="download-progress-bar">
-                <div class="download-progress-bar-inner" id="downloadProgressBar"></div>
-            </div>
-
-            <div class="download-counter" id="downloadCounter">0/0</div>
-            <div class="download-file-info" id="downloadFileInfo">准备中...</div>
-
-            <button class="btn btn-primary" id="downloadOverlayClose" onclick="hideDownloadOverlay()">关闭</button>
-        </div>
-    </div>
-
     <script>
         const ALLOWED_EXTENSIONS = ['.mp4', '.avi', '.mkv', '.mov'];
         const files = new Map();
@@ -741,7 +625,7 @@
                         const pathSpan = document.getElementById('selectedDirPath');
                         pathSpan.textContent = dirHandle.name;
                         pathSpan.title = `已选择目录: ${dirHandle.name}`;
-                        showToast(`已恢复保存目录: ${dirHandle.name}`, 'success');
+                        updateGlobalStatus(`已恢复保存目录: ${dirHandle.name}`, 'success', false);
                         return true;
                     }
                 } catch (permErr) {
@@ -888,7 +772,7 @@
         async function selectSaveDirectory() {
             try {
                 if (!('showDirectoryPicker' in window)) {
-                    showToast('你的浏览器不支持选择目录功能，文件将保存到默认下载位置', 'error');
+                    updateGlobalStatus('您的浏览器不支持选择目录功能', 'error', false, '文件将保存到默认下载位置');
                     return;
                 }
 
@@ -904,38 +788,24 @@
                 const pathSpan = document.getElementById('selectedDirPath');
                 pathSpan.textContent = dirHandle.name;
                 pathSpan.title = `已选择目录: ${dirHandle.name}`;
-                showToast(`已成功选择保存目录: ${dirHandle.name}`, 'success');
+                updateGlobalStatus(`已成功选择保存目录: ${dirHandle.name}`, 'success', false);
                 
                 // 保存目录句柄
                 await saveDirectoryHandle(dirHandle);
             } catch (err) {
                 if (err.name === 'AbortError') {
-                    showToast('用户取消了目录选择', 'error');
+                    updateGlobalStatus('用户取消了目录选择', 'error', false);
                 } else {
                     console.error('选择目录失败:', err);
-                    showToast('选择目录失败: ' + err.message, 'error');
+                    updateGlobalStatus('选择目录失败: ' + err.message, 'error', false);
                 }
             }
         }
 
-        // 显示提示框
+        // 将showToast函数改为updateGlobalStatus函数的简单封装
         function showToast(message, type = 'success') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            container.appendChild(toast);
-
-            // 3秒后自动消失
-            setTimeout(() => {
-                toast.style.animation = 'toastOut var(--transition-normal) forwards';
-                setTimeout(() => container.removeChild(toast), 300);
-            }, 3000);
-
-            // 同时更新全局状态面板(如果是重要消息)
-            if (type === 'success' || type === 'error') {
-                updateGlobalStatus(message, type);
-            }
+            // 直接使用updateGlobalStatus，不再创建Toast元素
+            updateGlobalStatus(message, type, false);
         }
 
         // 更新全局状态面板
@@ -957,7 +827,7 @@
             
             // 更新消息
             statusMessage.textContent = message;
-            statusInfo.textContent = details;
+            statusInfo.textContent = details || '';
             
             // 更新计数器
             if (completed !== null && total !== null) {
@@ -986,13 +856,11 @@
                 const writable = await fileHandle.createWritable();
                 await writable.write(fileData);
                 await writable.close();
-                showToast(`文件 ${fileName} 已保存到 ${selectedDirHandle.name}`);
-                updateGlobalStatus(`文件已保存: ${fileName}`, 'success', false, `保存在目录: ${selectedDirHandle.name}`);
+                updateGlobalStatus(`文件 ${fileName} 已保存到 ${selectedDirHandle.name}`, 'success', false);
                 return true;
             } catch (err) {
                 console.error('保存文件失败:', err);
-                showToast(`保存文件 ${fileName} 失败: ${err.message}`, 'error');
-                updateGlobalStatus(`保存失败: ${fileName}`, 'error', false, err.message);
+                updateGlobalStatus(`保存文件 ${fileName} 失败: ${err.message}`, 'error', false);
                 return false;
             }
         }
@@ -1038,7 +906,7 @@
                 // 检查文件类型
                 const ext = '.' + file.name.split('.').pop().toLowerCase();
                 if (!ALLOWED_EXTENSIONS.includes(ext)) {
-                    alert(`不支持的文件类型: ${file.name}`);
+                    updateGlobalStatus(`不支持的文件类型: ${file.name}`, 'error', false);
                     continue;
                 }
 
@@ -1331,66 +1199,12 @@
                 setTimeout(() => {
                     URL.revokeObjectURL(url);
                     document.body.removeChild(a);
-                    showToast(`文件 ${newFileName} 开始下载`);
-                    updateGlobalStatus(`文件开始下载: ${newFileName}`, 'success', false);
+                    updateGlobalStatus(`文件 ${newFileName} 开始下载`, 'success', false);
                 }, 1000);
             } catch (error) {
                 console.error('下载文件时出错:', error);
-                showToast(`下载文件 ${fileInfo.file.name} 失败: ${error.message}`, 'error');
-                updateGlobalStatus(`下载失败: ${fileInfo.file.name}`, 'error', false, error.message);
+                updateGlobalStatus(`下载文件 ${fileInfo.file.name} 失败: ${error.message}`, 'error', false);
             }
-        }
-
-        // 显示下载进度覆盖层
-        function showDownloadOverlay(total) {
-            const overlay = document.getElementById('downloadOverlay');
-            const progressBar = document.getElementById('downloadProgressBar');
-            const counter = document.getElementById('downloadCounter');
-            const fileInfo = document.getElementById('downloadFileInfo');
-            const subtitle = document.getElementById('downloadOverlaySubtitle');
-            
-            // 重置进度
-            progressBar.style.width = '0%';
-            counter.textContent = `0/${total}`;
-            fileInfo.textContent = '准备下载...';
-            subtitle.textContent = `共 ${total} 个文件等待处理`;
-            
-            // 显示覆盖层
-            overlay.style.display = 'flex';
-            
-            // 禁用关闭按钮，直到处理完成
-            document.getElementById('downloadOverlayClose').disabled = true;
-        }
-        
-        // 更新下载进度
-        function updateDownloadProgress(current, total, fileName, fileSize) {
-            const progressBar = document.getElementById('downloadProgressBar');
-            const counter = document.getElementById('downloadCounter');
-            const fileInfo = document.getElementById('downloadFileInfo');
-            const subtitle = document.getElementById('downloadOverlaySubtitle');
-            
-            // 更新进度条
-            const percent = Math.round((current / total) * 100);
-            progressBar.style.width = `${percent}%`;
-            
-            // 更新计数器
-            counter.textContent = `${current}/${total}`;
-            
-            // 更新文件信息
-            fileInfo.textContent = `当前处理: ${fileName} (${fileSize})`;
-            
-            // 更新副标题
-            if (current === total) {
-                subtitle.textContent = '所有文件处理完成!';
-                document.getElementById('downloadOverlayClose').disabled = false;
-            } else {
-                subtitle.textContent = `正在处理第 ${current} 个文件，共 ${total} 个`;
-            }
-        }
-        
-        // 隐藏下载进度覆盖层
-        function hideDownloadOverlay() {
-            document.getElementById('downloadOverlay').style.display = 'none';
         }
 
         // 修改批量下载函数
@@ -1403,15 +1217,13 @@
                     .filter(([_, fileInfo]) => fileInfo.status === 'completed');
                 
                 if (completedFiles.length === 0) {
-                    showToast('没有可下载的文件', 'error');
                     updateGlobalStatus('没有可下载的文件', 'error', false);
                     return;
                 }
 
-                // 显示下载进度覆盖层
-                showDownloadOverlay(completedFiles.length);
+                // 使用全局状态面板显示下载进度
+                updateGlobalStatus(`开始批量下载 ${completedFiles.length} 个文件`, 'info', true, '准备下载...', 0, completedFiles.length);
                 
-                updateGlobalStatus(`开始批量下载 ${completedFiles.length} 个文件`, 'info', true, '', 0, completedFiles.length);
                 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
                 const customSuffix = document.getElementById('customSuffix').value || '-new';
                 let successCount = 0;
@@ -1425,17 +1237,29 @@
                         const fileSizeGB = (fileInfo.file.size / (1024 * 1024 * 1024)).toFixed(2);
                         const sizeDisplay = fileSizeMB > 1024 ? `${fileSizeGB} GB` : `${fileSizeMB} MB`;
                         
-                        // 更新下载进度覆盖层
-                        updateDownloadProgress(i + 1, completedFiles.length, newFileName, sizeDisplay);
-                        
-                        updateGlobalStatus(`正在保存 (${i+1}/${completedFiles.length}): ${newFileName}`, 'info', true, `文件大小: ${sizeDisplay}`, i, completedFiles.length);
+                        // 使用全局状态面板更新进度
+                        updateGlobalStatus(
+                            `正在下载 (${i+1}/${completedFiles.length})`, 
+                            'info', 
+                            true, 
+                            `当前文件: ${newFileName} (${sizeDisplay})`,
+                            i,
+                            completedFiles.length
+                        );
 
                         // 如果选择了目录，尝试保存到指定目录
                         if (selectedDirHandle) {
                             const saved = await saveFileToDirectory(fileInfo.modifiedFile, newFileName);
                             if (saved) {
                                 successCount++;
-                                updateGlobalStatus(`已保存 (${i+1}/${completedFiles.length}): ${newFileName}`, 'info', true, `已成功: ${successCount}`, successCount, completedFiles.length);
+                                updateGlobalStatus(
+                                    `正在下载 (${i+1}/${completedFiles.length})`, 
+                                    'info', 
+                                    true, 
+                                    `已保存: ${newFileName} (${sizeDisplay})`,
+                                    i+1,
+                                    completedFiles.length
+                                );
                                 continue;
                             }
                         }
@@ -1452,45 +1276,46 @@
                         URL.revokeObjectURL(url);
                         document.body.removeChild(a);
                         successCount++;
-                        updateGlobalStatus(`已下载 (${i+1}/${completedFiles.length}): ${newFileName}`, 'info', true, `已成功: ${successCount}`, successCount, completedFiles.length);
+                        updateGlobalStatus(
+                            `正在下载 (${i+1}/${completedFiles.length})`, 
+                            'info', 
+                            true, 
+                            `已下载: ${newFileName} (${sizeDisplay})`,
+                            i+1,
+                            completedFiles.length
+                        );
                         
                         if (i < completedFiles.length - 1) {
                             await delay(1000);
                         }
                     } catch (error) {
                         console.error(`下载文件 ${fileInfo.file.name} 时出错:`, error);
-                        showToast(`下载文件 ${fileInfo.file.name} 失败: ${error.message}`, 'error');
-                        updateGlobalStatus(`下载失败: ${fileInfo.file.name}`, 'error', false, error.message, successCount, completedFiles.length);
-                        
-                        // 更新下载进度覆盖层，标记错误
-                        const fileInfo = document.getElementById('downloadFileInfo');
-                        fileInfo.textContent = `错误: ${error.message}`;
-                        fileInfo.style.color = 'var(--error-500)';
+                        updateGlobalStatus(
+                            `下载出错 (${i+1}/${completedFiles.length})`, 
+                            'error', 
+                            false, 
+                            `文件 ${fileInfo.file.name}: ${error.message}`,
+                            i+1,
+                            completedFiles.length
+                        );
                     }
                 }
 
                 if (successCount > 0) {
-                    showToast(`成功处理 ${successCount} 个文件`);
-                    updateGlobalStatus(`批量下载完成: ${successCount}/${completedFiles.length} 个文件`, 'success', false, `所有任务已完成`, successCount, completedFiles.length);
-                    
-                    // 更新下载进度覆盖层
-                    const fileInfo = document.getElementById('downloadFileInfo');
-                    fileInfo.textContent = `成功下载 ${successCount} 个文件，共 ${completedFiles.length} 个`;
-                    fileInfo.style.color = 'var(--success-500)';
+                    updateGlobalStatus(
+                        `批量下载完成`, 
+                        'success', 
+                        false, 
+                        `成功下载 ${successCount}/${completedFiles.length} 个文件`,
+                        successCount, 
+                        completedFiles.length
+                    );
                 }
             } catch (error) {
                 console.error('批量下载出错:', error);
-                showToast('下载过程中出现错误，请重试', 'error');
                 updateGlobalStatus('批量下载失败', 'error', false, error.message);
-                
-                // 更新下载进度覆盖层
-                const fileInfo = document.getElementById('downloadFileInfo');
-                fileInfo.textContent = `下载过程中出现错误: ${error.message}`;
-                fileInfo.style.color = 'var(--error-500)';
             } finally {
                 updateDownloadAllButton();
-                // 启用关闭按钮
-                document.getElementById('downloadOverlayClose').disabled = false;
             }
         }
 
@@ -1579,11 +1404,9 @@
             
             // 如果没有恢复成功，并且浏览器支持目录选择API，则请求新的目录
             if (!restored && 'showDirectoryPicker' in window) {
-                showToast('即将请求选择保存目录权限...', 'success');
-                updateGlobalStatus('正在请求目录权限...', 'info', true);
+                updateGlobalStatus('即将请求选择保存目录权限...', 'info', true);
                 setTimeout(() => selectSaveDirectory(), 1000);
             } else if (!('showDirectoryPicker' in window)) {
-                showToast('您的浏览器不支持文件系统访问API，文件将保存到默认下载位置', 'error');
                 updateGlobalStatus('无法使用本地文件系统', 'error', false, '文件将保存到默认下载位置');
             }
         }, 500);
