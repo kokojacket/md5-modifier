@@ -968,11 +968,59 @@
 
             try {
                 updateGlobalStatus(`正在保存到目录: ${fileName}`, 'info', true, `目标目录: ${selectedDirHandle.name}`);
-                const fileHandle = await selectedDirHandle.getFileHandle(fileName, { create: true });
+                
+                // 检查文件是否已存在并处理重名情况
+                let finalFileName = fileName;
+                let fileExists = true;
+                let counter = 1;
+                
+                // 文件存在性检查函数
+                const checkFileExists = async (name) => {
+                    try {
+                        await selectedDirHandle.getFileHandle(name);
+                        return true; // 文件存在
+                    } catch (err) {
+                        if (err.name === 'NotFoundError') {
+                            return false; // 文件不存在
+                        }
+                        throw err; // 其他错误
+                    }
+                };
+                
+                // 生成新文件名的函数
+                const generateNewFileName = (origName, num) => {
+                    const dotIndex = origName.lastIndexOf('.');
+                    if (dotIndex === -1) {
+                        // 没有扩展名
+                        return `${origName}-${num}`;
+                    } else {
+                        // 有扩展名，在扩展名前添加计数
+                        const name = origName.substring(0, dotIndex);
+                        const ext = origName.substring(dotIndex);
+                        return `${name}-${num}${ext}`;
+                    }
+                };
+                
+                // 检查文件是否存在，若存在则重命名
+                fileExists = await checkFileExists(finalFileName);
+                while (fileExists) {
+                    finalFileName = generateNewFileName(fileName, counter);
+                    fileExists = await checkFileExists(finalFileName);
+                    counter++;
+                }
+                
+                // 创建并写入文件
+                const fileHandle = await selectedDirHandle.getFileHandle(finalFileName, { create: true });
                 const writable = await fileHandle.createWritable();
                 await writable.write(fileData);
                 await writable.close();
-                updateGlobalStatus(`文件 ${fileName} 已保存到 ${selectedDirHandle.name}`, 'success', false);
+                
+                // 更新状态
+                if (finalFileName !== fileName) {
+                    updateGlobalStatus(`文件已保存为 ${finalFileName}`, 'success', false, `由于同名文件存在，自动重命名为 ${finalFileName}`);
+                } else {
+                    updateGlobalStatus(`文件 ${finalFileName} 已保存到 ${selectedDirHandle.name}`, 'success', false);
+                }
                 return true;
             } catch (err) {
                 console.error('保存文件失败:', err);
