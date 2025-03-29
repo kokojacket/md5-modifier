@@ -741,7 +741,7 @@
                         const pathSpan = document.getElementById('selectedDirPath');
                         pathSpan.textContent = dirHandle.name;
                         pathSpan.title = `已选择目录: ${dirHandle.name}`;
-                        updateGlobalStatus(`已恢复保存目录: ${dirHandle.name}`, 'success', false);
+                        updateGlobalStatus(`已恢复保存目录: ${dirHandle.name}`, 'success', false, '您现在可以从该目录选择文件或拖放文件到此处');
                         return true;
                     }
                 } catch (permErr) {
@@ -904,7 +904,7 @@
                 const pathSpan = document.getElementById('selectedDirPath');
                 pathSpan.textContent = dirHandle.name;
                 pathSpan.title = `已选择目录: ${dirHandle.name}`;
-                updateGlobalStatus(`已成功选择保存目录: ${dirHandle.name}`, 'success', false);
+                updateGlobalStatus(`已成功选择保存目录: ${dirHandle.name}`, 'success', false, '您现在可以从该目录选择文件或拖放文件到此处');
                 
                 // 保存目录句柄
                 await saveDirectoryHandle(dirHandle);
@@ -1034,7 +1034,42 @@
             const dropZone = document.getElementById('dropZone');
             const fileInput = document.getElementById('fileInput');
 
-            dropZone.addEventListener('click', () => fileInput.click());
+            dropZone.addEventListener('click', async () => {
+                // 使用File System Access API选择文件（如果支持且已有目录句柄）
+                if ('showOpenFilePicker' in window && selectedDirHandle) {
+                    try {
+                        const fileHandles = await window.showOpenFilePicker({
+                            multiple: true,
+                            types: [
+                                {
+                                    description: '视频文件',
+                                    accept: {
+                                        'video/*': ALLOWED_EXTENSIONS
+                                    }
+                                }
+                            ],
+                            startIn: selectedDirHandle
+                        });
+                        
+                        if (fileHandles && fileHandles.length > 0) {
+                            const filesArray = [];
+                            for (const fileHandle of fileHandles) {
+                                const file = await fileHandle.getFile();
+                                filesArray.push(file);
+                            }
+                            handleFiles(filesArray);
+                        }
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            console.error('选择文件出错:', err);
+                            updateGlobalStatus('选择文件失败: ' + err.message, 'error', false);
+                        }
+                    }
+                } else {
+                    // 回退到传统方法
+                    fileInput.click();
+                }
+            });
             fileInput.addEventListener('change', handleFileSelect);
 
             dropZone.addEventListener('dragover', (e) => {
@@ -1668,9 +1703,13 @@
             // 首先尝试恢复之前保存的目录
             const restored = await tryRestoreDirectoryHandle();
             
+            // 如果目录恢复成功，提示用户可以从同一目录选择文件
+            if (restored) {
+                updateGlobalStatus('已恢复保存目录', 'success', false, '您现在可以从该目录选择文件或拖放文件到此处');
+            }
             // 如果没有恢复成功，并且浏览器支持目录选择API，则请求新的目录
-            if (!restored && 'showDirectoryPicker' in window) {
-                updateGlobalStatus('即将请求选择保存目录权限...', 'info', true);
+            else if ('showDirectoryPicker' in window) {
+                updateGlobalStatus('即将请求选择保存目录权限...', 'info', true, '选择目录后可直接从该目录选择文件');
                 setTimeout(() => selectSaveDirectory(), 1000);
             } else if (!('showDirectoryPicker' in window)) {
                 updateGlobalStatus('无法使用本地文件系统', 'error', false, '文件将保存到默认下载位置');
